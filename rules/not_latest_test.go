@@ -3,7 +3,6 @@ package rules
 import (
 	"testing"
 
-	"github.com/flavio/kube-image-bouncer/rules"
 )
 
 func TestIsUsingLatest(t *testing.T) {
@@ -17,7 +16,7 @@ func TestIsUsingLatest(t *testing.T) {
 	}
 
 	for image, expected := range testData {
-		actual, err := rules.IsUsingLatestTag(image)
+		actual, err := IsUsingLatestTag(image)
 		if err != nil {
 			t.Fatalf("Unexpected error while processing image %s: %v", image, err)
 		}

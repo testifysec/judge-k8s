@@ -2,3 +2,4 @@
 *.cert
 kube-image-bouncer
 pki
+.dccache

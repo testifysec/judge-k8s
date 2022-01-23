@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/flavio/kube-image-bouncer/rules"
+	"github.com/testifysec/judge-k8s/rules"
 
 	"github.com/labstack/echo"
 	"k8s.io/api/imagepolicy/v1alpha1"

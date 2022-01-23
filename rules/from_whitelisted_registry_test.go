@@ -2,8 +2,6 @@ package rules
 
 import (
 	"testing"
-
-	"github.com/flavio/kube-image-bouncer/rules"
 )
 
 func TestIsFromWhitelistedRegistry(t *testing.T) {
@@ -20,7 +18,7 @@ func TestIsFromWhitelistedRegistry(t *testing.T) {
 	}
 
 	for image, expected := range testData {
-		actual, err := rules.IsFromWhiteListedRegistry(image, whitelist)
+		actual, err := IsFromWhiteListedRegistry(image, whitelist)
 		if err != nil {
 			t.Fatalf("Unexpected error while processing image %s: %v", image, err)
 		}
