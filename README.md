@@ -1,4 +1,4 @@
-# kube-image-bouncer
+# judge-k8s
 
 A simple webhook endpoint server that can be used to validate the images being
 created inside of the kubernetes cluster.
