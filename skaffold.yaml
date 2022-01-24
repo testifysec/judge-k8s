@@ -1,0 +1,19 @@
+apiVersion: skaffold/v2beta26
+kind: Config
+metadata:
+  name: judge-k8s
+build:
+  artifacts:
+  - image: k3d-registry:34751/judge-k8s
+    ko: {}
+  local:
+    concurrency: 1
+    tryImportMissing: false
+    useDockerCLI: false
+deploy:
+  kubectl:
+    manifests:
+    - kubernetes/judge-k8s-webhook.yaml
+    - kubernetes/nginx-latest.yaml
+    - kubernetes/nginx-versioned.yaml
+    - kubernetes/validating-webhook-configuration.yaml

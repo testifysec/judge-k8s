@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: judge-k8s-webhook
+  name: judge-k8s-webhook
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 1323
+      protocol: "TCP"
+  selector:
+    app: judge-k8s-webhook
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: judge-k8s-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: judge-k8s-webhook
+  template:
+    metadata:
+      labels:
+        app: judge-k8s-webhook
+    spec:
+      containers:
+        - name: judge-k8s-webhook
+          image: "k3d-registry:34751/judge-k8s"
+          # args:
+          #   - "--cert=/etc/admission-controller/tls/tls.crt"
+          #   - "--key=/etc/admission-controller/tls/tls.key"
+          #   - "--debug"
+      #     volumeMounts:
+      #       - name: tls
+      #         mountPath: /etc/admission-controller/tls
+      # volumes:
+      #   - name: tls
+      #     secret:
+      #       secretName: tls-judge-k8s-webhook
