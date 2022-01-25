@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: judge-k8s-webhook
-          image: "k3d-registry:34751/judge-k8s"
+          image: "skaffold-dev:34751/judge-k8s"
           # args:
           #   - "--cert=/etc/admission-controller/tls/tls.crt"
           #   - "--key=/etc/admission-controller/tls/tls.key"

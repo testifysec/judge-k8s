@@ -4,7 +4,7 @@ metadata:
   name: judge-k8s
 build:
   artifacts:
-  - image: k3d-registry:34751/judge-k8s
+  - image: skaffold-dev:34751/judge-k8s
     ko: {}
   local:
     concurrency: 1
