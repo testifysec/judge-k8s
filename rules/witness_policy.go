@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/regclient/regclient/regclient"
 	"github.com/regclient/regclient/regclient/manifest"
 	"github.com/regclient/regclient/regclient/types"
@@ -30,7 +29,11 @@ func getManifest(image string) manifest.Manifest {
 		fmt.Println(err)
 	}
 
-	spew.Dump(m)
+	configDigest, err := m.GetConfigDigest()
+	if err != nil {
+		fmt.Println(err)
+	}
 
+	fmt.Printf("ContainerID: %s\n", configDigest)
 	return m
 }
