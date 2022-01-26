@@ -5,13 +5,26 @@ metadata:
 build:
   artifacts:
   - image: skaffold-dev:34751/judge-k8s
-    ko: {}
+    ko:
+      dir: .
+  - image: skaffold-dev:34751/rekor
+    sync:
+      infer:
+        - "./../rekor/**/*.go"
+    ko:
+      dir: "../rekor"
+      main: "../rekor/cmd/rekor-server"
+    context: "../rekor"
   local:
-    concurrency: 1
+    concurrency: 5
     tryImportMissing: false
-    useDockerCLI: false
+    useDockerCLI: true
+    
+    
+  
 deploy:
   kubectl:
     manifests:
     - dev/k8s/judge-k8s-webhook.yaml
     - dev/k8s/webhook-server-tls.yaml
+    
