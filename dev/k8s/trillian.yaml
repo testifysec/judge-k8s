@@ -1,0 +1,120 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: logserver-service
+  labels:
+    app: trillian-log-server
+spec:
+  selector:
+    app: trillian-log-server
+  ports:
+  - name: grpc
+    port: 8080
+    targetPort: 8090
+  - name: http
+    port: 8091
+    targetPort: 8091
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: logsigner-service
+  labels:
+    app: logsigner
+spec:
+  selector:
+    app: trillian-log-signer
+  ports:
+  - name: grpc
+    port: 8090
+    targetPort: 8090
+  - name: http
+    port: 8091
+    targetPort: 8091
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: trillian-log-server
+  name: trillian-log-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trillian-log-server
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: trillian-log-server
+    spec:
+      containers:
+      - image: gcr.io/trillian-opensource-ci/log_server:df474653733c51ed91d60cf3efee69f7bf3199bd
+        name: log-server
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        args:
+          - "--storage_system=mysql"
+          - "--mysql_uri=root:root@tcp(mysql)/rekor"
+          - "--rpc_endpoint=0.0.0.0:8090"
+          - "--http_endpoint=0.0.0.0:8091"
+          - "--alsologtostderr"
+        ports:
+          - containerPort: 8090
+            name: grpc
+          - containerPort: 8091
+            name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: trillian-log-signer
+  name: trillian-log-signer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trillian-log-signer
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: trillian-log-signer
+    spec:
+      containers:
+      - image: gcr.io/trillian-opensource-ci/log_signer:df474653733c51ed91d60cf3efee69f7bf3199bd
+        name: log-signer
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        args:
+          - "--storage_system=mysql"
+          - "--mysql_uri=root:root@tcp(mysql)/rekor"
+          - "--rpc_endpoint=0.0.0.0:8090"
+          - "--http_endpoint=0.0.0.0:8091"
+          - "--force_master"
+          - "--alsologtostderr"
+        ports:
+          - containerPort: 8090
+            name: grpc
+          - containerPort: 8091
+            name: http
