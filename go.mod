@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/containers/image v3.0.2+incompatible
+	github.com/davecgh/go-spew v1.1.1
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.2.2-0.20180426014445-588f4e8bddc6
 	gopkg.in/urfave/cli.v1 v1.20.0

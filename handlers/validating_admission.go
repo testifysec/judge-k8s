@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/testifysec/judge-k8s/rules"
 
 	"github.com/labstack/echo"
 	"k8s.io/api/admission/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,37 +40,24 @@ func PostValidatingAdmission() echo.HandlerFunc {
 
 		for _, container := range pod.Spec.Containers {
 			images = append(images, container.Image)
-			usingLatest, err := rules.IsUsingLatestTag(container.Image)
+
+			spew.Dump(container.Image)
+
+			pass, err := rules.DoesPassWitnessPolicy(container.Image, []byte{})
 			if err != nil {
-				c.Logger().Errorf("Error while parsing image name: %+v", err)
-				return c.JSON(http.StatusInternalServerError, "error while parsing image name")
-			}
-			if usingLatest {
-				admissionReviewResponse.Response.Allowed = false
-				admissionReviewResponse.Response.Result = &metav1.Status{
-					Message: "Images using latest tag are not allowed",
-				}
-				break
+				c.Logger().Errorf("Error while checking witness policy: %+v", err)
+				return c.JSON(http.StatusInternalServerError, "error while checking witness policy")
 			}
 
-			if len(RegistryWhitelist) > 0 {
-				validRegistry, err := rules.IsFromWhiteListedRegistry(
-					container.Image,
-					RegistryWhitelist)
-				if err != nil {
-					c.Logger().Errorf("Error while looking for image registry: %+v", err)
-					return c.JSON(
-						http.StatusInternalServerError,
-						"error while looking for image registry")
+			if !pass {
+				admissionReviewResponse.Response.Allowed = false
+				admissionReviewResponse.Response.Result = &metav1.Status{
+					Message: "Images not allowed by witness policy",
 				}
-				if !validRegistry {
-					admissionReviewResponse.Response.Allowed = false
-					admissionReviewResponse.Response.Result = &metav1.Status{
-						Message: "Images from a non whitelisted registry",
-					}
-					break
-				}
+				break
+
 			}
+
 		}
 
 		if admissionReviewResponse.Response.Allowed {

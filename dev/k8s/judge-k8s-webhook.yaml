@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: judge-k8s-webhook
+  name: judge-k8s-webhook
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 1323
+      protocol: "TCP"
+  selector:
+    app: judge-k8s-webhook
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: judge-k8s-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: judge-k8s-webhook
+  template:
+    metadata:
+      labels:
+        app: judge-k8s-webhook
+    spec:
+      containers:
+      - name: judge-k8s-webhook
+        image: "skaffold-dev:34751/judge-k8s"
+        args:
+          - "--cert=/run/secrets/tls/tls.crt"
+          - "--key=/run/secrets/tls/tls.key"
+          - "--debug"
+        volumeMounts:
+        - name: webhook-tls-certs
+          mountPath: /run/secrets/tls
+          readOnly: true
+        ports:
+        - name: http
+          containerPort: 1323
+      volumes:
+      - name: webhook-tls-certs
+        secret:
+          secretName: webhook-server-tls
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: judge-k8s-webook
+webhooks:
+  - name: judge-k8s-webhook.default.svc
+    admissionReviewVersions:
+      - "v1"
+      - "v1beta1"
+    failurePolicy: Ignore
+    sideEffects: None
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURQekNDQWllZ0F3SUJBZ0lVSFYwVUc1dWxSZytjeWUveG1RODl4MkthVzRJd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0x6RXRNQ3NHQTFVRUF3d2tRV1J0YVhOemFXOXVJRU52Ym5SeWIyeHNaWElnVjJWaWFHOXZheUJFWlcxdgpJRU5CTUI0WERUSXlNREV5TmpFMk1qY3lNVm9YRFRJeU1ESXlOVEUyTWpjeU1Wb3dMekV0TUNzR0ExVUVBd3drClFXUnRhWE56YVc5dUlFTnZiblJ5YjJ4c1pYSWdWMlZpYUc5dmF5QkVaVzF2SUVOQk1JSUJJakFOQmdrcWhraUcKOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQXpFVDlobXlnVkIrd1U2Z2lLa2h6U0FvV0I1dFdNb3ZDZlhuVwpXQTVMYlNQdjNBZTFiQk5HVFo4WWF4N3pPRFk0UXBTTHovc1BnSkFqTU9CKzYxbk1ZUTdNYlBhblR4YndnU2tmCjVPbzlpVHBWUTE1ZkRoZXBaOXlkU05XM1BMalc4dWhNOGw4Q3FFOFpIYjBDZ3p0TERmZ0I1NzZ4eXM0NHpzZUwKNk1ka1RjdEo1ZE9FZU9TTE91TUNaWDhpc0JkYVVKYzE2WU1qWDM3Z0EzbkFqQWtVWXhuQWE0T0o1UVRBa2pBNwpsMCtybkZNYVZmQnB5d1NxdVFNaU5veEhjR0IzWkk2ck04WkJCRXl4R05HNEc1SCsrVEVpRXpDTmdFTkNSeG9qClNaMEo5M2ZlL2lack1VUC9pbGQvNTRqQmVaL2NlYW1lMkJieE5UL2NrU0tHSmxjYy93SURBUUFCbzFNd1VUQWQKQmdOVkhRNEVGZ1FVMDh0SmF3aVBQUGtzaFZUZDd6SUZqazNxbGNNd0h3WURWUjBqQkJnd0ZvQVUwOHRKYXdpUApQUGtzaFZUZDd6SUZqazNxbGNNd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBTkJna3Foa2lHOXcwQkFRc0ZBQU9DCkFRRUFZN3hyZ0pPMk10ckhxT0xLbU1mYXVBQnpqQ1dtalQxL2ZIV1ZTeGYwUlVzMUhhQVk0SXFBaytYanFIYXYKa3JRREpRVEUwUU93am5DSmZOWGpJRWQzeS9GQ3F0Y0hsZ3FxbUlUMkk0MTJ4TkpRb2VIRkFpaVd6SnBodnhwWgpnVWZaWWlmdEhBN1BmMDdiRnN6cE9hVGFUWi91NVR1OFNUL2l6MVA2RVVaSndyOUo3cFV4bnhkQ3hFZkFpK2NOCmhtQlJCbHh4OUVCWWlWTzVzenZHMVBjUjNBb25tRDQzZm5DSk1Qay95YllrUktLaHVsaHlWeFV1R1hQL0kxNHoKTDVrYzJqU2JoQ3M1L3llQUxDN1c2amhCNTZWV294MGQ4U0xPdHg3Nit4eFFvSlhIRVhmR3c1OWprREIySU43RwoyWW83c2FVeGlsZkIycmFiK2NYdW8vNGFNUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+      service:
+        name: judge-k8s-webhook
+        namespace: default
