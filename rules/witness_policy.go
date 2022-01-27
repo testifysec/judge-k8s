@@ -2,11 +2,15 @@ package rules
 
 import (
 	"context"
+	"crypto"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/regclient/regclient/regclient"
 	"github.com/regclient/regclient/regclient/manifest"
 	"github.com/regclient/regclient/regclient/types"
+	"github.com/testifysec/witness/pkg/cryptoutil"
+	"github.com/testifysec/witness/pkg/rekor"
 )
 
 func DoesPassWitnessPolicy(image string, policy []byte) (bool, error) {
@@ -34,6 +38,36 @@ func getManifest(image string) manifest.Manifest {
 		fmt.Println(err)
 	}
 
-	fmt.Printf("ContainerID: %s\n", configDigest)
+	fmt.Printf(" ContainerID: %s\n", configDigest)
+
+	getRekorEntry(configDigest.String())
 	return m
+}
+
+func getRekorEntry(containerID string) {
+	r, err := rekor.New("http://172.22.0.3:32107")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	ds := cryptoutil.DigestSet{}
+
+	ds[crypto.SHA256] = containerID
+
+	fmt.Printf("Looking up rekor for ContainerID: %s\n", containerID)
+
+	rekorEntry, err := r.FindEntriesBySubject(ds)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	spew.Dump(rekorEntry)
+
+	entry, err := r.FindEntriesBySubject(ds)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	spew.Dump(entry)
+
 }
