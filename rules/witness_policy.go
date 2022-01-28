@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/regclient/regclient/regclient"
@@ -51,6 +52,7 @@ func getRekorEntry(containerID string) {
 	}
 
 	ds := cryptoutil.DigestSet{}
+	containerID = strings.Replace(containerID, "sha256:", "", -1)
 
 	ds[crypto.SHA256] = containerID
 
