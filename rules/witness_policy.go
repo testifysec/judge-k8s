@@ -45,7 +45,7 @@ func getManifest(image string) manifest.Manifest {
 }
 
 func getRekorEntry(containerID string) {
-	r, err := rekor.New("http://172.22.0.3:3301")
+	r, err := rekor.New("http://rekor-server:8077")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -53,6 +53,8 @@ func getRekorEntry(containerID string) {
 	ds := cryptoutil.DigestSet{}
 
 	ds[crypto.SHA256] = containerID
+
+	spew.Dump(ds)
 
 	fmt.Printf("Looking up rekor for ContainerID: %s\n", containerID)
 
