@@ -16,10 +16,11 @@ func (ro *RootOptions) AddFlags(cmd *cobra.Command) {
 }
 
 type ServeOptions struct {
-	Port       int
-	Cert       string
-	Key        string
-	PolicyFile string
+	Port        int
+	Cert        string
+	Key         string
+	PolicyFile  string
+	RekorServer string
 }
 
 func (so *ServeOptions) AddFlags(cmd *cobra.Command) {
@@ -27,4 +28,5 @@ func (so *ServeOptions) AddFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&so.Cert, "cert", "c", "", "Path to TLS certificate file")
 	cmd.PersistentFlags().StringVarP(&so.Key, "key", "k", "k", "Path to TLS key file")
 	cmd.PersistentFlags().StringVarP(&so.PolicyFile, "policy", "p", "", "Path to the policy file")
+	cmd.PersistentFlags().StringVarP(&so.RekorServer, "rekor-server", "r", "http://rekor-server:8077", "Rekor server address")
 }
