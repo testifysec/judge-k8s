@@ -30,11 +30,14 @@ spec:
       containers:
       - name: judge-k8s-webhook
         image: "skaffold-dev:34751/judge-k8s"
+        command:
+          - "judge-k8s"
+          - "serve"
         args:
           - "--cert=/run/secrets/tls/tls.crt"
           - "--key=/run/secrets/tls/tls.key"
-          - "--debug"
           - "--policy=/run/witness-policy/witness-policy.json"
+          - "--port=1323"
         volumeMounts:
         - name: webhook-tls-certs
           mountPath: /run/secrets/tls
