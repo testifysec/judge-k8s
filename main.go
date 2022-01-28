@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
@@ -14,7 +13,7 @@ import (
 )
 
 func main() {
-	var cert, key, whitelist string
+	var cert, key, policyFile string
 	var port int
 	var debug bool
 
@@ -25,38 +24,40 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "cert, c",
-			Usage:       "Path to the certificate to use",
-			EnvVar:      "BOUNCER_CERTIFICATE",
+			Usage:       "Path to the TLS certificate to use",
+			EnvVar:      "JUDGE_CERTIFICATE",
 			Destination: &cert,
 		},
 		cli.StringFlag{
 			Name:        "key, k",
-			Usage:       "Path to the key to use",
-			EnvVar:      "BOUNCER_KEY",
+			Usage:       "Path to the TLS key to use",
+			EnvVar:      "JUDGE_KEY",
 			Destination: &key,
-		},
-		cli.StringFlag{
-			Name:        "registry-whitelist",
-			Usage:       "Comma separated list of accepted registries",
-			EnvVar:      "BOUNCER_REGISTRY_WHITELIST",
-			Destination: &whitelist,
 		},
 		cli.IntFlag{
 			Name:        "port, p",
 			Value:       1323,
 			Usage:       "Port to listen to",
-			EnvVar:      "BOUNCER_PORT",
+			EnvVar:      "JUDGE_PORT",
 			Destination: &port,
 		},
 		cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Enable extra debugging",
-			EnvVar:      "BOUNCER_DEBUG",
+			EnvVar:      "JUDGE_DEBUG",
 			Destination: &debug,
+		},
+		cli.StringFlag{
+			Name:        "policy",
+			Usage:       "Path to the policy file",
+			EnvVar:      "JUDGE_POLICY",
+			Destination: &policyFile,
 		},
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(ctx *cli.Context) error {
+		ctx.Set("policyFile", policyFile)
+
 		e := echo.New()
 		e.POST("/image_policy", handlers.PostImagePolicy())
 		e.POST("/", handlers.PostValidatingAdmission())
@@ -67,16 +68,6 @@ func main() {
 
 		if debug {
 			e.Logger.SetLevel(log.DEBUG)
-		}
-
-		if whitelist != "" {
-			handlers.RegistryWhitelist = strings.Split(whitelist, ",")
-			fmt.Printf(
-				"Accepting only images from these registries: %+v\n",
-				handlers.RegistryWhitelist)
-			fmt.Println("WARN: this feature is implemented only by the ValidatingAdmissionWebhook code")
-		} else {
-			fmt.Println("WARN: accepting images from ALL registries")
 		}
 
 		var err error

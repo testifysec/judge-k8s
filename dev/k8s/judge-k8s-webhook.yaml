@@ -34,9 +34,13 @@ spec:
           - "--cert=/run/secrets/tls/tls.crt"
           - "--key=/run/secrets/tls/tls.key"
           - "--debug"
+          - "--policy=/run/witness-policy/witness-policy.json"
         volumeMounts:
         - name: webhook-tls-certs
           mountPath: /run/secrets/tls
+          readOnly: true
+        - name: witness-policy
+          mountPath: /run/witness-policy
           readOnly: true
         ports:
         - name: http
@@ -45,6 +49,9 @@ spec:
       - name: webhook-tls-certs
         secret:
           secretName: webhook-server-tls
+      - name: witness-policy
+        configMap:
+          name: witness-policy
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -67,3 +74,11 @@ webhooks:
       service:
         name: judge-k8s-webhook
         namespace: default
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: witness-policy
+data:
+  witness-policy.json: | 
+    {"payload":"CnsKICAgICJleHBpcmVzIjogIjIwMjItMTItMTdUMjM6NTc6NDAtMDU6MDAiLAogICAgInN0ZXBzIjogewogICAgICAiYnVpbGQiOiB7CiAgICAgICAgIm5hbWUiOiAiYnVpbGQiLAogICAgICAgICJhdHRlc3RhdGlvbnMiOiBbCiAgICAgICAgICB7CiAgICAgICAgICAgICJ0eXBlIjogImh0dHBzOi8vd2l0bmVzcy50ZXN0aWZ5c2VjLmNvbS9hdHRlc3RhdGlvbnMvbWF0ZXJpYWwvdjAuMSIsCiAgICAgICAgICAgICJwb2xpY2llcyI6IFtdCiAgICAgICAgICB9LAogICAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJodHRwczovL3dpdG5lc3MudGVzdGlmeXNlYy5jb20vYXR0ZXN0YXRpb25zL2NvbW1hbmQtcnVuL3YwLjEiLAogICAgICAgICAgICAicG9saWNpZXMiOiBbXQogICAgICAgICAgfSwKICAgICAgICAgIHsKICAgICAgICAgICAgInR5cGUiOiAiaHR0cHM6Ly93aXRuZXNzLnRlc3RpZnlzZWMuY29tL2F0dGVzdGF0aW9ucy9wcm9kdWN0L3YwLjEiLAogICAgICAgICAgICAicG9saWNpZXMiOiBbXQogICAgICAgICAgfQogICAgICAgIF0sCiAgICAgICAgImZ1bmN0aW9uYXJpZXMiOiBbCiAgICAgICAgICB7CiAgICAgICAgICAgICJwdWJsaWNrZXlpZCI6ICJhZTJkY2M5ODllYTljMTA5YTM2ZThlYmE1YzRiYzE2ZDhmYWZjZmU4ZTFhNjE0MTY0NjcwZDUwYWVkYWNkNjQ3IgogICAgICAgICAgfQogICAgICAgIF0KICAgICAgfQogICAgfSwKICAgICJwdWJsaWNrZXlzIjogewogICAgICAiYWUyZGNjOTg5ZWE5YzEwOWEzNmU4ZWJhNWM0YmMxNmQ4ZmFmY2ZlOGUxYTYxNDE2NDY3MGQ1MGFlZGFjZDY0NyI6IHsKICAgICAgICAia2V5aWQiOiAiYWUyZGNjOTg5ZWE5YzEwOWEzNmU4ZWJhNWM0YmMxNmQ4ZmFmY2ZlOGUxYTYxNDE2NDY3MGQ1MGFlZGFjZDY0NyIsCiAgICAgICAgImtleSI6ICJMUzB0TFMxQ1JVZEpUaUJRVlVKTVNVTWdTMFZaTFMwdExTMEtUVU52ZDBKUldVUkxNbFozUVhsRlFXWXlPVzlRVURoVloyaENlVWM0TlRKMVFtUlBlSEpLUzB0dU4wMU5OV2hVWWxBNVpYTm5UMW92YXpBOUNpMHRMUzB0UlU1RUlGQlZRa3hKUXlCTFJWa3RMUzB0TFFvPSIKICAgICAgfQogICAgfQogIH0=","payloadType":"https://witness.testifysec.com/policy/v0.1","signatures":[{"keyid":"ae2dcc989ea9c109a36e8eba5c4bc16d8fafcfe8e1a614164670d50aedacd647","sig":"zAifH+7qT04KxDPXAa86XDgh1tvGMRaYj9ffv0TdhmWOmp6YkgJkN3d+CSJTBsxGavp3ijflBHWt9hsE/JOoAg=="}]}

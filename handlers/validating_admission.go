@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/testifysec/judge-k8s/rules"
@@ -14,6 +16,23 @@ import (
 )
 
 var RegistryWhitelist []string
+
+func getWitnessPolicy(policyFile string) ([]byte, error) {
+	f, err := os.Open(policyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+
+	policy, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	return policy, nil
+
+}
 
 func PostValidatingAdmission() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -38,10 +57,21 @@ func PostValidatingAdmission() echo.HandlerFunc {
 		admissionReviewResponse.Response.Allowed = true
 		images := []string{}
 
+		policy, err := getWitnessPolicy("/run/witness-policy/witness-policy.json")
+		if err != nil {
+			c.Logger().Errorf("Something went wrong while getting witness policy: %+v", err)
+			return c.JSON(http.StatusBadRequest, err)
+		}
+
+		spew.Dump(policy)
+
+		if err != nil {
+			c.Logger().Errorf("Something went wrong while getting witness policy: %+v", err)
+			return c.JSON(http.StatusBadRequest, err)
+		}
+
 		for _, container := range pod.Spec.Containers {
 			images = append(images, container.Image)
-
-			spew.Dump(container.Image)
 
 			pass, err := rules.DoesPassWitnessPolicy(container.Image, []byte{})
 			if err != nil {
