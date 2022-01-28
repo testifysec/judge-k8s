@@ -45,7 +45,7 @@ func getManifest(image string) manifest.Manifest {
 }
 
 func getRekorEntry(containerID string) {
-	r, err := rekor.New("http://172.22.0.3:32107")
+	r, err := rekor.New("http://172.22.0.3:3301")
 	if err != nil {
 		fmt.Println(err)
 	}

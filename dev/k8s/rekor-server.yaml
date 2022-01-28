@@ -42,11 +42,10 @@ spec:
         args: [
           "serve",
           "--trillian_log_server.address=logserver-service",
-          "--trillian_log_server.port=8090",
+          "--trillian_log_server.port=8080",
           "--rekor_server.address=0.0.0.0",
           "--redis_server.address=redis",
           "--redis_server.port=6379",
-          "--trillian_log_server.tlog_id=3904496407287907110",
           "--rekor_server.signer=memory",
           "--enable_attestation_storage",
           "--attestation_storage_bucket=file:///attestations",
@@ -70,4 +69,5 @@ spec:
     - protocol: TCP
       port: 8077
       targetPort: 3000
+      nodePort: 30331
 ---
