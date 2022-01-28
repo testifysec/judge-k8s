@@ -25,7 +25,7 @@ spec:
         app: mysql
     spec:
       containers:
-      - image: mysql:5.6
+      - image: docker.io/library/mysql@sha256:c2e99ad580f5f03f4e0f09f22169d90c561da383781531fe712f6eb0e494d332
         name: mysql
         env:
           # Use secret in real usage

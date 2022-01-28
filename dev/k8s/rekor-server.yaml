@@ -33,6 +33,11 @@ spec:
         prometheus.io/path: /metrics
         prometheus.io/port: "2112"
     spec:
+      restartPolicy: Always
+      initContainers:
+      - name: init-myservice
+        image: busybox:1.28
+        command: ['sh', '-c', "sleep 20"]
       containers:
       - name: rekor-server
         image: skaffold-dev:34751/rekor

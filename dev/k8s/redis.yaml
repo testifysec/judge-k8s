@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis
+        image: docker.io/library/redis@sha256:03f00cd789243846888e2f834c762f53b224b9970b434a192b0f6b533d7e219c
         imagePullPolicy: Always
         ports:
         - containerPort: 6379
