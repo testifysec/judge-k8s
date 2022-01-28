@@ -56,7 +56,8 @@ spec:
       initContainers:
       - name: init-myservice
         image: busybox:1.28
-        command: ['sh', '-c', "sleep 15"]
+        command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 3; printf "-"; done; echo -e "  >> MySQL DB Server has started";']
+
       containers:
       - image: gcr.io/trillian-opensource-ci/log_server@sha256:9d7e793bafb19e3c5bcfb5150d92ca579dc823204ad59b041a5f3a9253e59420
         name: log-server
@@ -93,6 +94,10 @@ spec:
       labels:
         app: trillian-log-signer
     spec:
+      initContainers:
+      - name: init-myservice
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 3; printf "-"; done; echo -e "  >> MySQL DB Server has started";']
       containers:
       - image: gcr.io/trillian-opensource-ci/log_signer:df474653733c51ed91d60cf3efee69f7bf3199bd
         name: log-signer
@@ -108,3 +113,4 @@ spec:
             name: grpc
           - containerPort: 8091
             name: http
+        

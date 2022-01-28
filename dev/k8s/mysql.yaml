@@ -36,6 +36,27 @@ spec:
         ports:
         - containerPort: 3306
           name: mysql
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+    
 ---
 apiVersion: batch/v1
 kind: Job
@@ -46,11 +67,18 @@ spec:
     metadata:
       name:  rekor-db-init-job
     spec:
+      initContainers:
+        - name: init-myservice
+          image: busybox:1.28
+          command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL DB Server has started";']
       containers:
         - name: db-init
           image: docker.io/library/mysql@sha256:1ea233722275afb6bf54bdb53bcb162bdb9f3ceed69c64836250f72bc641f63a
           resources:
             requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
               cpu: 100m
               memory: 100Mi
           command: ["mysql"]
