@@ -77,7 +77,7 @@ func PostValidatingAdmission(o options.ServeOptions) echo.HandlerFunc {
 		}
 
 		for i, rekorUID := range rekorStrings {
-			annotations[fmt.Sprintf("testifysec.io/rekoruid/%d", i)] = rekorUID
+			annotations[fmt.Sprintf("testifysec.io/rekoruid%d", i)] = rekorUID
 		}
 
 		patch, err := createPatch(pod, annotations)
@@ -93,8 +93,19 @@ func PostValidatingAdmission(o options.ServeOptions) echo.HandlerFunc {
 		admissionResponse.Allowed = true
 		admissionResponse.Patch = patch
 		admissionResponse.PatchType = pt
-		spew.Sdump(admissionResponse)
-		return c.JSONBlob(http.StatusOK, admissionResponse.Ma)
+		admissionResponse.UID = admissionReviewReq.Request.UID
+		admissionResponse.AuditAnnotations = annotations
+
+		admissionReviewReq.Response = &admissionResponse
+
+		pp, err := json.MarshalIndent(&admissionReviewReq, "", "  ")
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(pp)
+
+		return c.JSON(http.StatusOK, &admissionReviewReq)
 	}
 }
 
