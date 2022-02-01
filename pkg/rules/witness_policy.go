@@ -3,7 +3,9 @@ package rules
 import (
 	"context"
 	"crypto"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -13,7 +15,9 @@ import (
 	"github.com/regclient/regclient/regclient/types"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/testifysec/judge-k8s/cmd/options"
+	witness "github.com/testifysec/witness/pkg"
 	"github.com/testifysec/witness/pkg/cryptoutil"
+	"github.com/testifysec/witness/pkg/dsse"
 	"github.com/testifysec/witness/pkg/rekor"
 )
 
@@ -23,11 +27,25 @@ type WitnessPolicy struct {
 	Rekor     rekor.RekorClient
 	RegClient regclient.RegClient
 	Policy    []byte
+	PublicKey []byte
 }
 
 func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 
 	wp := &WitnessPolicy{}
+
+	f, err := os.Open(o.PublicKey)
+	defer f.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open public key file: %v", err)
+	}
+
+	pubKeyBytes, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read public key file: %v", err)
+	}
+
+	wp.PublicKey = pubKeyBytes
 
 	b, err := os.ReadFile(o.PolicyFile)
 	if err != nil {
@@ -115,9 +133,41 @@ func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 }
 
 func (wp *WitnessPolicy) doesPassWitnessPolicy() bool {
-	for _, entry := range wp.Entries {
-		fmt.Printf("%s\n", entry.LogID)
-
+	policyEnvelope := dsse.Envelope{}
+	decoder := json.NewDecoder(strings.NewReader(string(wp.Policy)))
+	if err := decoder.Decode(&policyEnvelope); err != nil {
+		log.Error("failed to decode policy: %v", err)
+		return false
 	}
-	return true
+
+	envelopes := make([]dsse.Envelope, 0)
+
+	for _, entry := range wp.Entries {
+		env, err := rekor.ParseEnvelopeFromEntry(entry)
+		if err != nil {
+			log.Error("failed to parse envelope from entry: %v", err)
+			return false
+		}
+		envelopes = append(envelopes, env)
+	}
+
+	if len(envelopes) == 0 {
+		log.Error("no envelopes found")
+		return false
+	}
+
+	pubKeyReader := strings.NewReader(string(wp.PublicKey))
+
+	verifier, err := cryptoutil.NewVerifierFromReader(pubKeyReader)
+	if err != nil {
+		fmt.Printf("failed to create verifier: %v", err)
+		return false
+	}
+
+	err = witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(envelopes))
+	if err == nil {
+		return true
+	}
+
+	return false
 }

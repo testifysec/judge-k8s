@@ -21,6 +21,7 @@ type ServeOptions struct {
 	Key         string
 	PolicyFile  string
 	RekorServer string
+	PublicKey   string
 }
 
 func (so *ServeOptions) AddFlags(cmd *cobra.Command) {
@@ -29,4 +30,5 @@ func (so *ServeOptions) AddFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&so.Key, "key", "k", "k", "Path to TLS key file")
 	cmd.PersistentFlags().StringVarP(&so.PolicyFile, "policy", "p", "", "Path to the policy file")
 	cmd.PersistentFlags().StringVarP(&so.RekorServer, "rekor-server", "r", "http://rekor-server:8077", "Rekor server address")
+	cmd.PersistentFlags().StringVarP(&so.PublicKey, "public-key", "", "", "Path to the pem encoded public key file")
 }
