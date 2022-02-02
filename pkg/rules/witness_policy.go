@@ -35,10 +35,11 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 	wp := &WitnessPolicy{}
 
 	f, err := os.Open(o.PublicKey)
-	defer f.Close()
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to open public key file: %v", err)
 	}
+	defer f.Close()
 
 	pubKeyBytes, err := ioutil.ReadAll(f)
 	if err != nil {
@@ -63,24 +64,20 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 	return wp, nil
 }
 
-func (wp *WitnessPolicy) Verify(imageRef string) (error, []string) {
+func (wp *WitnessPolicy) Verify(imageRef string) ([]string, error) {
 	m, err := wp.getManifest(imageRef)
 	if err != nil {
-		return fmt.Errorf("failed to get manifest: %v", err), nil
+		return nil, fmt.Errorf("failed to get manifest: %v", err)
 	}
 
 	configDigest, err := m.GetConfigDigest()
 	if err != nil {
-		return fmt.Errorf("failed to get config digest: %v", err), nil
+		return nil, fmt.Errorf("failed to get config digest: %v", err)
 	}
 
 	err = wp.getRekorEntries(configDigest.String())
 	if err != nil {
-		return fmt.Errorf("failed to get rekor entry: %v", err), nil
-	}
-
-	if !wp.doesPassWitnessPolicy() {
-		return fmt.Errorf("failed to pass witness policy"), nil
+		return nil, fmt.Errorf("failed to get rekor entries: %v", err)
 	}
 
 	entryStrings := []string{}
@@ -89,7 +86,13 @@ func (wp *WitnessPolicy) Verify(imageRef string) (error, []string) {
 		entryStrings = append(entryStrings, *entry.LogID)
 	}
 
-	return nil, entryStrings
+	err = wp.doesPassWitnessPolicy()
+	if err != nil {
+		return entryStrings, err
+	}
+
+	//Passes all checks
+	return entryStrings, nil
 
 }
 
@@ -132,12 +135,11 @@ func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 
 }
 
-func (wp *WitnessPolicy) doesPassWitnessPolicy() bool {
+func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 	policyEnvelope := dsse.Envelope{}
 	decoder := json.NewDecoder(strings.NewReader(string(wp.Policy)))
 	if err := decoder.Decode(&policyEnvelope); err != nil {
-		log.Error("failed to decode policy: %v", err)
-		return false
+		return fmt.Errorf("failed to decode policy: %v", err)
 	}
 
 	envelopes := make([]dsse.Envelope, 0)
@@ -145,29 +147,28 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() bool {
 	for _, entry := range wp.Entries {
 		env, err := rekor.ParseEnvelopeFromEntry(entry)
 		if err != nil {
-			log.Error("failed to parse envelope from entry: %v", err)
-			return false
+			return fmt.Errorf("failed to parse envelope: %v", err)
 		}
 		envelopes = append(envelopes, env)
 	}
 
 	if len(envelopes) == 0 {
-		log.Error("no envelopes found")
-		return false
+		return fmt.Errorf("no envelopes found")
 	}
 
 	pubKeyReader := strings.NewReader(string(wp.PublicKey))
 
 	verifier, err := cryptoutil.NewVerifierFromReader(pubKeyReader)
 	if err != nil {
-		fmt.Printf("failed to create verifier: %v", err)
-		return false
+		return err
 	}
 
-	err = witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(envelopes))
-	if err == nil {
-		return true
+	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(envelopes))
+	if reason == nil {
+
+		//Policy Passed
+		return nil
 	}
 
-	return false
+	return fmt.Errorf("policy failed to verify: %v", reason)
 }

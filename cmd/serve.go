@@ -29,7 +29,7 @@ func ServCmd() *cobra.Command {
 func runServ(o options.ServeOptions) error {
 	e := echo.New()
 	e.Logger.SetLevel(log.Level())
-	e.POST("/", handlers.PostValidatingAdmission(o))
+	e.POST("/mutate", handlers.PostValidatingAdmission(o))
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "method=${method}, uri=${uri}, status=${status}\n",
 	}))

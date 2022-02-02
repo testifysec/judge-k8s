@@ -3,9 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/testifysec/judge-k8s/cmd/options"
@@ -16,23 +14,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func getWitnessPolicy(policyFile string) ([]byte, error) {
-	f, err := os.Open(policyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	defer f.Close()
-
-	policy, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	return policy, nil
-
-}
 
 func PostValidatingAdmission(o options.ServeOptions) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -51,29 +32,33 @@ func PostValidatingAdmission(o options.ServeOptions) echo.HandlerFunc {
 		}
 
 		rekorStrings := []string{}
-		admissionResponse := admv1.AdmissionResponse{}
+		admissionResponse := admv1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Message: "Unknown Erorr",
+				Code:    http.StatusForbidden,
+			},
+
+			UID: admissionReviewReq.Request.UID,
+		}
+
+		admissionReviewReq.Response = &admissionResponse
 
 		for _, container := range pod.Spec.Containers {
 			wp, err := rules.New(&o)
 			if err != nil {
-				fmt.Printf("failed to create witness policy: %v", err)
-				c.Logger().Errorf("Something went wrong while creating witness policy: %+v", err)
-				return c.JSON(http.StatusBadRequest, err)
+				admissionResponse.Result.Message = err.Error()
+				return c.JSON(http.StatusOK, admissionReviewReq)
 			}
 
-			err, rekorUIDs := wp.Verify(container.Image)
+			rekorUIDs, err := wp.Verify(container.Image)
 			if err != nil {
-				fmt.Printf("failed to verify: %v", err)
-				c.Logger().Errorf("Something went wrong while verifying witness policy: %+v", err)
-				admissionResponse.Allowed = false
-				admissionResponse.Result = &metav1.Status{
-					Message: "Images not allowed by witness policy",
-				}
-				break
+				admissionReviewReq.Response.Warnings = append(admissionReviewReq.Response.Warnings, fmt.Sprintf("failed to verify image: %v", err))
+				admissionReviewReq.Response.Result.Message = err.Error()
+				return c.JSON(http.StatusOK, admissionReviewReq)
+
 			}
-
 			rekorStrings = append(rekorStrings, rekorUIDs...)
-
 		}
 
 		for i, rekorUID := range rekorStrings {
@@ -90,26 +75,18 @@ func PostValidatingAdmission(o options.ServeOptions) echo.HandlerFunc {
 			return &pt
 		}()
 
-		admissionResponse.Allowed = true
-		admissionResponse.Patch = patch
-		admissionResponse.PatchType = pt
-		admissionResponse.UID = admissionReviewReq.Request.UID
-		admissionResponse.AuditAnnotations = annotations
-
-		admissionReviewReq.Response = &admissionResponse
-
-		pp, err := json.MarshalIndent(&admissionReviewReq, "", "  ")
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(pp)
+		admissionReviewReq.Response.Allowed = true
+		admissionReviewReq.Response.PatchType = pt
+		admissionReviewReq.Response.Patch = patch
+		admissionReviewReq.Response.Result.Message = "OK"
+		admissionReviewReq.Response.Result.Code = http.StatusOK
 
 		return c.JSON(http.StatusOK, &admissionReviewReq)
 	}
 }
 
 func updateAnnotation(target map[string]string, added map[string]string) (patch []patchOperation) {
+
 	for key, value := range added {
 		if target == nil || target[key] == "" {
 			target = map[string]string{}

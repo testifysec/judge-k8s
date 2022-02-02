@@ -67,3 +67,12 @@ webhooks:
       service:
         name: judge-k8s-webhook
         namespace: default
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: witness-policy
+data:
+  witness-policy.json: | 
+    ${WITNESSPOLICY}
+  public-key.pem: |
+    ${PUBKEYPEM}
