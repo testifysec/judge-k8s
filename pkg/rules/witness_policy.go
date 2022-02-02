@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/labstack/gommon/log"
+	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/regclient/regclient/regclient"
 	"github.com/regclient/regclient/regclient/manifest"
 	"github.com/regclient/regclient/regclient/types"
@@ -56,6 +57,7 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 	wp.Policy = b
 
 	wp.RegClient = regclient.NewRegClient()
+
 	r, err := rekor.New(o.RekorServer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rekor client: %v", err)
@@ -67,16 +69,19 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 func (wp *WitnessPolicy) Verify(imageRef string) ([]string, error) {
 	m, err := wp.getManifest(imageRef)
 	if err != nil {
+		fmt.Printf("failed to get manifest: %v", err)
 		return nil, fmt.Errorf("failed to get manifest: %v", err)
 	}
 
 	configDigest, err := m.GetConfigDigest()
 	if err != nil {
+		fmt.Printf("failed to get config digest: %v", err)
 		return nil, fmt.Errorf("failed to get config digest: %v", err)
 	}
 
 	err = wp.getRekorEntries(configDigest.String())
 	if err != nil {
+		fmt.Printf("failed to get rekor entries: %v", err)
 		return nil, fmt.Errorf("failed to get rekor entries: %v", err)
 	}
 
@@ -104,33 +109,53 @@ func (wp *WitnessPolicy) getManifest(imageRef string) (manifest.Manifest, error)
 		return nil, fmt.Errorf("failed to create ref: %v", err)
 	}
 
-	m, err := wp.RegClient.ManifestGet(ctx, r)
+	manifest, err := wp.RegClient.ManifestGet(ctx, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get manifest: %v", err)
+
 	}
 
-	return m, nil
+	if manifest.IsList() {
+
+		plat := ociv1.Platform{
+			Architecture: "amd64",
+			OS:           "linux",
+		}
+
+		desc, err := manifest.GetPlatformDesc(&plat)
+		if err != nil {
+			return nil, err
+		}
+
+		r.Digest = desc.Digest.String()
+		manifest, err = wp.RegClient.ManifestGet(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return manifest, nil
 }
 
 func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 	ds := cryptoutil.DigestSet{}
 	containerID = strings.Replace(containerID, "sha256:", "", -1)
 	ds[crypto.SHA256] = containerID
-	log.Debug("Looking up rekor for ContainerID: %s", containerID)
+	fmt.Printf("looking up rekor entry for container id: %v", containerID)
 	entries, err := wp.Rekor.FindEntriesBySubject(ds)
 	if err != nil {
-		return fmt.Errorf("error finding entries: %v", err)
+		return fmt.Errorf("failed to get rekor entries: %v", err)
 	}
 
 	if len(entries) == 0 {
+		fmt.Printf("No entries found for ContainerID: %s", containerID)
 		return fmt.Errorf("no entries found")
 	}
 
 	for _, entry := range entries {
+		wp.Entries = append(wp.Entries, entry)
 		log.Debug("Found entry: %s", entry.LogID)
 	}
-
-	wp.Entries = entries
 	return nil
 
 }
