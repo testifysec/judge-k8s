@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/labstack/gommon/log"
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/regclient/regclient/regclient"
@@ -162,10 +163,17 @@ func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 
 func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 	policyEnvelope := dsse.Envelope{}
-	decoder := json.NewDecoder(strings.NewReader(string(wp.Policy)))
-	if err := decoder.Decode(&policyEnvelope); err != nil {
-		return fmt.Errorf("failed to decode policy: %v", err)
+	err := json.Unmarshal(wp.Policy, &policyEnvelope)
+
+	if err != nil {
+
+		return fmt.Errorf("failed to unmarshal policy: %v", err)
 	}
+
+	// decoder := json.NewDecoder(strings.NewReader(string(wp.Policy)))
+	// if err := decoder.Decode(&policyEnvelope); err != nil {
+	// 	return fmt.Errorf("failed to decode policy: %v", err)
+	// }
 
 	envelopes := make([]dsse.Envelope, 0)
 
@@ -185,10 +193,21 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 
 	verifier, err := cryptoutil.NewVerifierFromReader(pubKeyReader)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load key: %v", err)
+	}
+
+	for _, env := range envelopes {
+		jsonBytes, err := json.Marshal(env.Payload)
+		if err != nil {
+			return fmt.Errorf("failed to marshal envelope: %v", err)
+		}
+
+		fmt.Printf("verifying envelope: %v", string(jsonBytes))
 	}
 
 	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(envelopes))
+	spew.Dump(reason)
+
 	if reason == nil {
 
 		//Policy Passed

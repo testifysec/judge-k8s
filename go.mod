@@ -6,10 +6,11 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.2.2-0.20180426014445-588f4e8bddc6
+	github.com/opencontainers/image-spec v1.0.2
 	github.com/sigstore/rekor v0.4.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.3.0
-	github.com/testifysec/witness v0.0.1-alpha9
+	github.com/testifysec/witness v0.1.1
 	k8s.io/api v0.23.2
 	k8s.io/apimachinery v0.23.2
 )
@@ -68,7 +69,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/open-policy-agent/opa v0.35.0 // indirect
-	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
