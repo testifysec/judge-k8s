@@ -9,13 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/labstack/gommon/log"
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/regclient/regclient/regclient"
 	"github.com/regclient/regclient/regclient/manifest"
 	"github.com/regclient/regclient/regclient/types"
-	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/testifysec/judge-k8s/cmd/options"
 	witness "github.com/testifysec/witness/pkg"
 	"github.com/testifysec/witness/pkg/cryptoutil"
@@ -24,12 +21,12 @@ import (
 )
 
 type WitnessPolicy struct {
-	Manifest  manifest.Manifest
-	Entries   []*models.LogEntryAnon
-	Rekor     rekor.RekorClient
-	RegClient regclient.RegClient
-	Policy    []byte
-	PublicKey []byte
+	Manifest    manifest.Manifest
+	rekorServer string
+	Envelopes   []dsse.Envelope
+	RegClient   regclient.RegClient
+	Policy      []byte
+	PublicKey   []byte
 }
 
 func New(o *options.ServeOptions) (*WitnessPolicy, error) {
@@ -59,46 +56,37 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 
 	wp.RegClient = regclient.NewRegClient()
 
-	r, err := rekor.New(o.RekorServer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rekor client: %v", err)
-	}
-	wp.Rekor = r
+	wp.rekorServer = o.RekorServer
 	return wp, nil
 }
 
 func (wp *WitnessPolicy) Verify(imageRef string) ([]string, error) {
 	m, err := wp.getManifest(imageRef)
 	if err != nil {
-		fmt.Printf("failed to get manifest: %v", err)
+		fmt.Printf("failed to get manifest: %v\n", err)
 		return nil, fmt.Errorf("failed to get manifest: %v", err)
 	}
 
 	configDigest, err := m.GetConfigDigest()
 	if err != nil {
-		fmt.Printf("failed to get config digest: %v", err)
+		fmt.Printf("failed to get config digest: %v\n", err)
 		return nil, fmt.Errorf("failed to get config digest: %v", err)
 	}
 
 	err = wp.getRekorEntries(configDigest.String())
 	if err != nil {
-		fmt.Printf("failed to get rekor entries: %v", err)
+		fmt.Printf("failed to get rekor entries: %v=n", err)
 		return nil, fmt.Errorf("failed to get rekor entries: %v", err)
-	}
-
-	entryStrings := []string{}
-
-	for _, entry := range wp.Entries {
-		entryStrings = append(entryStrings, *entry.LogID)
 	}
 
 	err = wp.doesPassWitnessPolicy()
 	if err != nil {
-		return entryStrings, err
+		fmt.Printf("failed to pass witness policy: %v\n", err)
+		return []string{}, err
 	}
 
 	//Passes all checks
-	return entryStrings, nil
+	return []string{}, nil
 
 }
 
@@ -143,7 +131,9 @@ func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 	containerID = strings.Replace(containerID, "sha256:", "", -1)
 	ds[crypto.SHA256] = containerID
 	fmt.Printf("looking up rekor entry for container id: %v", containerID)
-	entries, err := wp.Rekor.FindEntriesBySubject(ds)
+
+	entries, err := loadEnvelopesFromRekor(wp.rekorServer, ds)
+
 	if err != nil {
 		return fmt.Errorf("failed to get rekor entries: %v", err)
 	}
@@ -153,10 +143,8 @@ func (wp *WitnessPolicy) getRekorEntries(containerID string) error {
 		return fmt.Errorf("no entries found")
 	}
 
-	for _, entry := range entries {
-		wp.Entries = append(wp.Entries, entry)
-		log.Debug("Found entry: %s", entry.LogID)
-	}
+	wp.Envelopes = entries
+
 	return nil
 
 }
@@ -170,25 +158,6 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 		return fmt.Errorf("failed to unmarshal policy: %v", err)
 	}
 
-	// decoder := json.NewDecoder(strings.NewReader(string(wp.Policy)))
-	// if err := decoder.Decode(&policyEnvelope); err != nil {
-	// 	return fmt.Errorf("failed to decode policy: %v", err)
-	// }
-
-	envelopes := make([]dsse.Envelope, 0)
-
-	for _, entry := range wp.Entries {
-		env, err := rekor.ParseEnvelopeFromEntry(entry)
-		if err != nil {
-			return fmt.Errorf("failed to parse envelope: %v", err)
-		}
-		envelopes = append(envelopes, env)
-	}
-
-	if len(envelopes) == 0 {
-		return fmt.Errorf("no envelopes found")
-	}
-
 	pubKeyReader := strings.NewReader(string(wp.PublicKey))
 
 	verifier, err := cryptoutil.NewVerifierFromReader(pubKeyReader)
@@ -196,17 +165,7 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 		return fmt.Errorf("failed to load key: %v", err)
 	}
 
-	for _, env := range envelopes {
-		jsonBytes, err := json.Marshal(env.Payload)
-		if err != nil {
-			return fmt.Errorf("failed to marshal envelope: %v", err)
-		}
-
-		fmt.Printf("verifying envelope: %v", string(jsonBytes))
-	}
-
-	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(envelopes))
-	spew.Dump(reason)
+	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(wp.Envelopes))
 
 	if reason == nil {
 
@@ -214,5 +173,48 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 		return nil
 	}
 
+	keyid, err := verifier.KeyID()
+	if err != nil {
+		return fmt.Errorf("failed to get key id: %v", err)
+	}
+
+	fmt.Printf("Keyid: %v\n", keyid)
+	fmt.Printf("PolicyKeyid: %v\n", policyEnvelope.Signatures[0].KeyID)
+	fmt.Printf("attestation keyid: %v\n", wp.Envelopes[0].Signatures[0].KeyID)
+
+	fmt.Printf("policy bytes:\n%s\n", wp.Policy)
+	fmt.Printf("public key:\n%s\n", wp.PublicKey)
+	for _, e := range wp.Envelopes {
+		out, err := json.Marshal(e)
+		if err != nil {
+			fmt.Printf("failed to marshal envelope: %v", err)
+		}
+
+		fmt.Printf("envelope:\n %s\n", out)
+	}
 	return fmt.Errorf("policy failed to verify: %v", reason)
+}
+
+func loadEnvelopesFromRekor(rekorServer string, artifactDigestSet cryptoutil.DigestSet) ([]dsse.Envelope, error) {
+	envelopes := make([]dsse.Envelope, 0)
+	rc, err := rekor.New(rekorServer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get initialize Rekor client: %w", err)
+	}
+
+	entries, err := rc.FindEntriesBySubject(artifactDigestSet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find any entries in rekor: %w", err)
+	}
+
+	for _, entry := range entries {
+		env, err := rekor.ParseEnvelopeFromEntry(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse dsse envelope from rekor entry: %w", err)
+		}
+
+		envelopes = append(envelopes, env)
+	}
+
+	return envelopes, nil
 }
