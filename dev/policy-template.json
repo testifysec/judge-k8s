@@ -1,0 +1,41 @@
+{
+  "expires": "2022-12-17T23:57:40-05:00",
+  "steps": {
+    "build": {
+      "name": "build",
+      "attestations": [
+        {
+          "type": "https://witness.testifysec.com/attestations/material/v0.1",
+          "regopolicies": []
+        },
+        {
+          "type": "https://witness.testifysec.com/attestations/command-run/v0.1",
+          "regopolicies": [
+              {
+                  "name": "testpolicy",
+                  "module": "{{B64_POLICY_MODULE}}"
+              }]
+        },
+        {
+          "type": "https://witness.testifysec.com/attestations/product/v0.1",
+          "regopolicies": []
+        },
+        {
+          "type": "https://witness.testifysec.com/attestations/oci/v0.1",
+          "regopolicies": []
+        }
+      ],
+      "functionaries": [
+        {
+          "publickeyid": "{{PUBLIC_KEY_ID}}"
+        }
+      ]
+    }
+  },
+  "publickeys": {
+    "{{PUBLIC_KEY_ID}}": {
+      "keyid": "{{PUBLIC_KEY_ID}}",
+      "key": "{{B64_PUBLIC_KEY}}"
+    }
+  }
+}

@@ -1,0 +1,216 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+    targetPort: 3306
+  selector:
+    app: mysql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: docker.io/library/mysql@sha256:c2e99ad580f5f03f4e0f09f22169d90c561da383781531fe712f6eb0e494d332
+        name: mysql
+        env:
+          # Use secret in real usage
+        - name: MYSQL_ROOT_PASSWORD
+          value: root
+        - name: MYSQL_DATABASE
+          value: rekor
+        ports:
+        - containerPort: 3306
+          name: mysql
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+    
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name:  rekor-db-init-job
+spec:
+  template:
+    metadata:
+      name:  rekor-db-init-job
+    spec:
+      initContainers:
+        - name: init-myservice
+          image: busybox:1.28
+          command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL DB Server has started";']
+      containers:
+        - name: db-init
+          image: docker.io/library/mysql@sha256:1ea233722275afb6bf54bdb53bcb162bdb9f3ceed69c64836250f72bc641f63a
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+          command: ["mysql"]
+          args:
+            - "--execute=$(SQL_FILE)"
+            - "--password=$(MYSQL_PASSWORD)"
+            - "--database=$(MYSQL_DATABASE)"
+          env:
+            - name: MYSQL_HOST
+              value: mysql
+            - name: MYSQL_USER
+              value: root
+            - name: SQL_FILE
+              valueFrom:
+                configMapKeyRef:
+                  name: rekor-db-init
+                  key: rekor.storage.sql
+            - name: MYSQL_DATABASE
+              value: rekor
+            - name: MYSQL_PASSWORD
+              value: root
+      restartPolicy: Never
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rekor-db-init
+data:
+  rekor.storage.sql: |
+    CREATE TABLE IF NOT EXISTS Trees(
+      TreeId                BIGINT NOT NULL,
+      TreeState             ENUM('ACTIVE', 'FROZEN', 'DRAINING') NOT NULL,
+      TreeType              ENUM('LOG', 'MAP', 'PREORDERED_LOG') NOT NULL,
+      HashStrategy          ENUM('RFC6962_SHA256', 'TEST_MAP_HASHER', 'OBJECT_RFC6962_SHA256', 'CONIKS_SHA512_256', 'CONIKS_SHA256') NOT NULL,
+      HashAlgorithm         ENUM('SHA256') NOT NULL,
+      SignatureAlgorithm    ENUM('ECDSA', 'RSA', 'ED25519') NOT NULL,
+      DisplayName           VARCHAR(20),
+      Description           VARCHAR(200),
+      CreateTimeMillis      BIGINT NOT NULL,
+      UpdateTimeMillis      BIGINT NOT NULL,
+      MaxRootDurationMillis BIGINT NOT NULL,
+      PrivateKey            MEDIUMBLOB NOT NULL,
+      PublicKey             MEDIUMBLOB NOT NULL,
+      Deleted               BOOLEAN,
+      DeleteTimeMillis      BIGINT,
+      PRIMARY KEY(TreeId)
+    );
+
+    CREATE TABLE IF NOT EXISTS TreeControl(
+      TreeId                  BIGINT NOT NULL,
+      SigningEnabled          BOOLEAN NOT NULL,
+      SequencingEnabled       BOOLEAN NOT NULL,
+      SequenceIntervalSeconds INTEGER NOT NULL,
+      PRIMARY KEY(TreeId),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS Subtree(
+      TreeId               BIGINT NOT NULL,
+      SubtreeId            VARBINARY(255) NOT NULL,
+      Nodes                MEDIUMBLOB NOT NULL,
+      SubtreeRevision      INTEGER NOT NULL,
+      PRIMARY KEY(TreeId, SubtreeId, SubtreeRevision),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS TreeHead(
+      TreeId               BIGINT NOT NULL,
+      TreeHeadTimestamp    BIGINT,
+      TreeSize             BIGINT,
+      RootHash             VARBINARY(255) NOT NULL,
+      RootSignature        VARBINARY(1024) NOT NULL,
+      TreeRevision         BIGINT,
+      PRIMARY KEY(TreeId, TreeHeadTimestamp),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+    ALTER TABLE TreeHead ADD UNIQUE INDEX TreeRevisionIdx(TreeId, TreeRevision);
+
+    CREATE TABLE IF NOT EXISTS LeafData(
+      TreeId               BIGINT NOT NULL,
+      LeafIdentityHash     VARBINARY(255) NOT NULL,
+      LeafValue            LONGBLOB NOT NULL,
+      ExtraData            LONGBLOB,
+      QueueTimestampNanos  BIGINT NOT NULL,
+      PRIMARY KEY(TreeId, LeafIdentityHash),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS SequencedLeafData(
+      TreeId               BIGINT NOT NULL,
+      SequenceNumber       BIGINT UNSIGNED NOT NULL,
+      LeafIdentityHash     VARBINARY(255) NOT NULL,
+      MerkleLeafHash       VARBINARY(255) NOT NULL,
+      IntegrateTimestampNanos BIGINT NOT NULL,
+      PRIMARY KEY(TreeId, SequenceNumber),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE,
+      FOREIGN KEY(TreeId, LeafIdentityHash) REFERENCES LeafData(TreeId, LeafIdentityHash) ON DELETE CASCADE
+    );
+
+    ALTER TABLE SequencedLeafData ADD INDEX LeafIdentityHashIdx(TreeId, LeafIdentityHash);
+
+    CREATE TABLE IF NOT EXISTS Unsequenced(
+      TreeId               BIGINT NOT NULL,
+      Bucket               INTEGER NOT NULL,
+      LeafIdentityHash     VARBINARY(255) NOT NULL,
+      MerkleLeafHash       VARBINARY(255) NOT NULL,
+      QueueTimestampNanos  BIGINT NOT NULL,
+      QueueID VARBINARY(32) DEFAULT NULL UNIQUE,
+      PRIMARY KEY (TreeId, Bucket, QueueTimestampNanos, LeafIdentityHash)
+    );
+
+
+    CREATE TABLE IF NOT EXISTS MapLeaf(
+      TreeId                BIGINT NOT NULL,
+      KeyHash               VARBINARY(255) NOT NULL,
+      MapRevision           BIGINT NOT NULL,
+      LeafValue             LONGBLOB NOT NULL,
+      PRIMARY KEY(TreeId, KeyHash, MapRevision),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+
+    CREATE TABLE IF NOT EXISTS MapHead(
+      TreeId               BIGINT NOT NULL,
+      MapHeadTimestamp     BIGINT,
+      RootHash             VARBINARY(255) NOT NULL,
+      MapRevision          BIGINT,
+      RootSignature        VARBINARY(1024) NOT NULL,
+      MapperData           MEDIUMBLOB,
+      PRIMARY KEY(TreeId, MapHeadTimestamp),
+      FOREIGN KEY(TreeId) REFERENCES Trees(TreeId) ON DELETE CASCADE
+    );
+
+    ALTER TABLE MapHead ADD UNIQUE INDEX MapRevisionIdx(TreeId, MapRevision);

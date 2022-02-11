@@ -5,15 +5,41 @@ metadata:
 build:
   artifacts:
   - image: skaffold-dev:34751/judge-k8s
-    ko: {}
+    ko:
+      dir: .
+      env:
+      - CGO_ENABLED=0
+      flags:
+      - -trimpath
+      ldflags:
+      - -extldflags "-static"
+  - image: skaffold-dev:34751/rekor
+    sync:
+      infer:
+        - "./../rekor/**/*.go"
+    ko:
+      fromImage: alpine
+      dir: "../rekor"
+      main: "../rekor/cmd/rekor-server"
+      env:
+      - CGO_ENABLED=0
+
+      flags:
+      - -trimpath
+      ldflags:
+      - -extldflags "-static"
+    context: "../rekor"
   local:
-    concurrency: 1
+    concurrency: 5
     tryImportMissing: false
-    useDockerCLI: false
+    useDockerCLI: true
+ 
 deploy:
   kubectl:
     manifests:
-    - kubernetes/judge-k8s-webhook.yaml
-    - kubernetes/nginx-latest.yaml
-    - kubernetes/nginx-versioned.yaml
-    - kubernetes/validating-webhook-configuration.yaml
+    - dev/k8s/judge-k8s-webhook.yaml
+    - dev/k8s/webhook-server-tls.yaml
+    - dev/k8s/rekor-server.yaml
+    - dev/k8s/trillian.yaml
+    - dev/k8s/redis.yaml
+    - dev/k8s/mysql.yaml
