@@ -40,6 +40,9 @@ kubectl create secret -n=judge-test tls webhook-server-tls \
 
 cd ..
 
+openssl genpkey -algorithm ed25519 -outform PEM -out testkey.pem
+openssl pkey -in testkey.pem -pubout > testpub.pem
+
 #inject rego
 
 #get b64 of policy
