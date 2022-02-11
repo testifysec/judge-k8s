@@ -63,14 +63,14 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 		return nil, fmt.Errorf("failed to read public key file: %v", err)
 	}
 
-	pubKeyBytes := []byte{}
+	pubKeyB64 := string(pubKeyB64Bytes)
 
-	_, err = base64.StdEncoding.Decode(pubKeyBytes, pubKeyB64Bytes)
+	pubKey, err := base64.StdEncoding.DecodeString(pubKeyB64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode public key file: %v", err)
 	}
 
-	wp.PublicKey = pubKeyBytes
+	wp.PublicKey = pubKey
 
 	b, err := os.ReadFile(o.PolicyFile)
 	if err != nil {

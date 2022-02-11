@@ -3,8 +3,6 @@
 set -e
 set -x
 
-
-
 rm out.tar | true
 rm -rf ./tmp
 
@@ -23,8 +21,17 @@ witness run -s=build -k testkey.pem -a oci -o attestation.json -r http://${ip}:$
 echo "verify attestation offline"
 witness verify -k testpub.pem -p policy-signed.json -a attestation.json -f ./tmp/out.tar
 
+echo "waiting 10 seconds for rekor to be ready"
+sleep 10
+
 echo "verify attestation online"
 witness verify -k testpub.pem -p policy-signed.json -r http://${ip}:${port} -f ./tmp/out.tar
+
+echo "verify attestation in online with kubernetes"
+kubectl -n=judge-test delete deploy test || true
+kubectl -n=judge-test create deployment --image=ttl.sh/8bd07846-7d97-4758-b7c5-7060d2471217:5h test
+
+kubectl -n=judge-test get deploy test -o=json | jq ".status.conditions[0].message"
 
 
 

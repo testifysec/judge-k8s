@@ -6,6 +6,6 @@ deny[msg]{
 }
 
 deny[msg]{
-	input.cmd[0] != "bash"
+	input.cmd[0] != "bash2"
     msg := "bash not used"
 }

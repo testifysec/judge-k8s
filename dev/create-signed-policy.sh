@@ -6,39 +6,39 @@ set -x
 
 
 
-cat >server.conf <<EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
-prompt = no
-[req_distinguished_name]
-CN = judge-k8s-webhook.judge-test.svc
-[ v3_req ]
-basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth, serverAuth
-subjectAltName = @alt_names
-[alt_names]
-DNS.1 = judge-k8s-webhook.judge-test.svc
-EOF
+# cat >server.conf <<EOF
+# [req]
+# req_extensions = v3_req
+# distinguished_name = req_distinguished_name
+# prompt = no
+# [req_distinguished_name]
+# CN = judge-k8s-webhook.judge-test.svc
+# [ v3_req ]
+# basicConstraints = CA:FALSE
+# keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+# extendedKeyUsage = clientAuth, serverAuth
+# subjectAltName = @alt_names
+# [alt_names]
+# DNS.1 = judge-k8s-webhook.judge-test.svc
+# EOF
 
 
-# Generate the CA cert and private key
-openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=Admission Controller Webhook Demo CA"
-# Generate the private key for the webhook server
-openssl genrsa -out webhook-server-tls.key 2048
-# Generate a Certificate Signing Request (CSR) for the private key, and sign it with the private key of the CA.
-openssl req -new -key webhook-server-tls.key -subj "/CN=judge-k8s-webhook.judge-test.svc" -config server.conf \
-    | openssl x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -out webhook-server-tls.crt -extensions v3_req -extfile server.conf
+# # Generate the CA cert and private key
+# openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=Admission Controller Webhook Demo CA"
+# # Generate the private key for the webhook server
+# openssl genrsa -out webhook-server-tls.key 2048
+# # Generate a Certificate Signing Request (CSR) for the private key, and sign it with the private key of the CA.
+# openssl req -new -key webhook-server-tls.key -subj "/CN=judge-k8s-webhook.judge-test.svc" -config server.conf \
+#     | openssl x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -out webhook-server-tls.crt -extensions v3_req -extfile server.conf
 
-cd k8s
+# cd k8s
 
-kubectl create secret -n=judge-test tls webhook-server-tls \
-    --cert "../webhook-server-tls.crt" \
-    --key "../webhook-server-tls.key" \
-    --dry-run=client -o yaml > webhook-server-tls.yaml
+# kubectl create secret -n=judge-test tls webhook-server-tls \
+#     --cert "../webhook-server-tls.crt" \
+#     --key "../webhook-server-tls.key" \
+#     --dry-run=client -o yaml > webhook-server-tls.yaml
 
-cd ..
+# cd ..
 
 openssl genpkey -algorithm ed25519 -outform PEM -out testkey.pem
 openssl pkey -in testkey.pem -pubout > testpub.pem
@@ -89,3 +89,4 @@ mv judge-k8s-webhook.yaml ./k8s/judge-k8s-webhook.yaml
 ./gen-attestation.sh
 
 rm policy-signed.json
+
