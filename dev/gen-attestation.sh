@@ -4,6 +4,7 @@ set -e
 set -x
 
 
+
 rm out.tar | true
 rm -rf ./tmp
 
@@ -18,9 +19,9 @@ port=`kubectl get svc rekor-server --template="{{range .spec.ports}}{{.nodePort}
 
 
 #test
-witness run -s=build -k testkey.pem -a oci -o attestation.json -r http://${ip}:${port} -- bash -c "docker save ttl.sh/$IMAGE_NAME:5h > ./tmp/out.tar"
-# echo "verify attestation offline"
-# witness verify -k testpub.pem -p policy-signed.json -a attestation.json -f ./tmp/out.tar
+witness run -s=build -k testkey.pem -a oci -o attestation.json -r http://${ip}:${port} -- bash -c "docker save ttl.sh/$IMAGE_NAME:5h > ./tmp/out.tar" | true
+echo "verify attestation offline"
+witness verify -k testpub.pem -p policy-signed.json -a attestation.json -f ./tmp/out.tar
 
 echo "verify attestation online"
 witness verify -k testpub.pem -p policy-signed.json -r http://${ip}:${port} -f ./tmp/out.tar
