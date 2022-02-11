@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"crypto"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -21,7 +22,6 @@ import (
 	"github.com/testifysec/witness/pkg/log"
 	"github.com/testifysec/witness/pkg/rekor"
 
-
 	// imported so their init functions run
 	_ "github.com/testifysec/witness/pkg/attestation/aws-iid"
 	_ "github.com/testifysec/witness/pkg/attestation/commandrun"
@@ -32,7 +32,6 @@ import (
 	_ "github.com/testifysec/witness/pkg/attestation/jwt"
 	_ "github.com/testifysec/witness/pkg/attestation/maven"
 	_ "github.com/testifysec/witness/pkg/attestation/oci"
-
 )
 
 func init() {
@@ -59,9 +58,16 @@ func New(o *options.ServeOptions) (*WitnessPolicy, error) {
 	}
 	defer f.Close()
 
-	pubKeyBytes, err := ioutil.ReadAll(f)
+	pubKeyB64Bytes, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read public key file: %v", err)
+	}
+
+	pubKeyBytes := []byte{}
+
+	_, err = base64.StdEncoding.Decode(pubKeyBytes, pubKeyB64Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode public key file: %v", err)
 	}
 
 	wp.PublicKey = pubKeyBytes
@@ -241,8 +247,7 @@ func loadEnvelopesFromRekor(rekorServer string, artifactDigestSet cryptoutil.Dig
 	return envelopes, nil
 }
 
-type logger struct {}
-
+type logger struct{}
 
 func (logger) Errorf(format string, args ...interface{}) {
 	fmt.Println(fmt.Sprintf(format, args...))
@@ -252,7 +257,7 @@ func (logger) Error(args ...interface{}) {
 	fmt.Println(args...)
 }
 
-func (logger)  Warnf(format string, args ...interface{}) {
+func (logger) Warnf(format string, args ...interface{}) {
 	fmt.Println(fmt.Sprintf(format, args...))
 }
 
