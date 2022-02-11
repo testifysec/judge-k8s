@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/regclient/regclient/regclient"
 	"github.com/regclient/regclient/regclient/manifest"
@@ -17,8 +18,26 @@ import (
 	witness "github.com/testifysec/witness/pkg"
 	"github.com/testifysec/witness/pkg/cryptoutil"
 	"github.com/testifysec/witness/pkg/dsse"
+	"github.com/testifysec/witness/pkg/log"
 	"github.com/testifysec/witness/pkg/rekor"
+
+
+	// imported so their init functions run
+	_ "github.com/testifysec/witness/pkg/attestation/aws-iid"
+	_ "github.com/testifysec/witness/pkg/attestation/commandrun"
+	_ "github.com/testifysec/witness/pkg/attestation/environment"
+	_ "github.com/testifysec/witness/pkg/attestation/gcp-iit"
+	_ "github.com/testifysec/witness/pkg/attestation/git"
+	_ "github.com/testifysec/witness/pkg/attestation/gitlab"
+	_ "github.com/testifysec/witness/pkg/attestation/jwt"
+	_ "github.com/testifysec/witness/pkg/attestation/maven"
+	_ "github.com/testifysec/witness/pkg/attestation/oci"
+
 )
+
+func init() {
+	log.SetLogger(logger{})
+}
 
 type WitnessPolicy struct {
 	Manifest    manifest.Manifest
@@ -165,7 +184,10 @@ func (wp *WitnessPolicy) doesPassWitnessPolicy() error {
 		return fmt.Errorf("failed to load key: %v", err)
 	}
 
-	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, witness.VerifyWithCollectionEnvelopes(wp.Envelopes))
+	veropt := witness.VerifyWithCollectionEnvelopes(wp.Envelopes)
+	spew.Dump(veropt)
+
+	reason := witness.Verify(policyEnvelope, []cryptoutil.Verifier{verifier}, veropt)
 
 	if reason == nil {
 
@@ -217,4 +239,39 @@ func loadEnvelopesFromRekor(rekorServer string, artifactDigestSet cryptoutil.Dig
 	}
 
 	return envelopes, nil
+}
+
+type logger struct {}
+
+
+func (logger) Errorf(format string, args ...interface{}) {
+	fmt.Println(fmt.Sprintf(format, args...))
+}
+
+func (logger) Error(args ...interface{}) {
+	fmt.Println(args...)
+}
+
+func (logger)  Warnf(format string, args ...interface{}) {
+	fmt.Println(fmt.Sprintf(format, args...))
+}
+
+func (logger) Warn(args ...interface{}) {
+	fmt.Println(args...)
+}
+
+func (logger) Debugf(format string, args ...interface{}) {
+	fmt.Println(fmt.Sprintf(format, args...))
+}
+
+func (logger) Debug(args ...interface{}) {
+	fmt.Println(args...)
+}
+
+func (logger) Infof(format string, args ...interface{}) {
+	fmt.Println(fmt.Sprintf(format, args...))
+}
+
+func (logger) Info(args ...interface{}) {
+	fmt.Println(args...)
 }
